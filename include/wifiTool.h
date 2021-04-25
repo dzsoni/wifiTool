@@ -11,8 +11,9 @@
 #ifndef WIFITOOL_h
 #define WIFITOOL_h
 
-#include "Arduino.h"
+#include <Arduino.h>
 #include <DNSServer.h>
+#include <vector>
 
 #include <ArduinoOTA.h>
 #ifdef ESP32
@@ -26,46 +27,53 @@
 #include <ESPAsyncTCP.h>
 #include <ESP8266mDNS.h>
 #endif
+
 #include <ESPAsyncWebServer.h>
 #include <SPIFFSEditor.h>
 
 #include "definitions.h"
 
+struct knownapsstruct
+  {
+    char *ssid;
+    char *passw;
+  };
+
 class WifiTool
 {
 public:
   WifiTool();
-  uint8_t wifiAutoConnect();
-  void runApPortal();
-  void runWifiPortal();
+  ~WifiTool();
   void process();
   void begin();
-  void begin(uint8_t autoConnectFlag);
 
 private:
+  void setUpSoftAP();
+  void setUpSTA();
+  unsigned long _restartsystem;
+  unsigned long _last_connect_atempt;
+  bool  _connecting;
+  byte  _last_connected_network;
+
   std::unique_ptr<DNSServer> dnsServer;
 #if defined(ESP32)
   std::unique_ptr<AsyncWebServer> server;
 #else
   std::unique_ptr<AsyncWebServer> server;
 #endif
+
+  std::vector<knownapsstruct> vektknownaps;
   File fsUploadFile;
-
-  boolean runAP;
-
-  // DNS server
-  const byte DNS_PORT = DEF_DNS_PORT;
-  void updateUpload();
-  void setUpAPService();
-  boolean connectAttempt(String ssid, String password);
+  String filetoString(const char *path);
   String getJSONValueByKey(String textToSearch, String key);
+  void updateUpload();
   void handleFileList(AsyncWebServerRequest *request);
   void handleFileDelete(AsyncWebServerRequest *request);
   void getWifiScanJson(AsyncWebServerRequest *request);
   void handleGetSavSecreteJson(AsyncWebServerRequest *request);
   int getRSSIasQuality(int RSSI);
-  unsigned long restartSystem;
   void handleUpload(AsyncWebServerRequest *request, String filename, String redirect, size_t index, uint8_t *data, size_t len, bool final);
+  void wifiAutoConnect(); 
 };
 
 #endif
