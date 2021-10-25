@@ -10,7 +10,7 @@
 
 #include "Arduino.h"
 #include "wifiTool.h"
-
+#include <stdlib.h>
 /*
     class CaptiveRequestHandler
 */
@@ -52,37 +52,27 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
-WifiTool::WifiTool()
+WifiTool::WifiTool(strDateTime &strdt, NTPtime &ntp_):_strdt(strdt),_ntp(ntp_)
 {
-  _restartsystem = 0;
-  _last_connect_atempt = 0;
+  _restartsystem          = 0;
+  _last_connect_atempt    = 0;
   _last_connected_network = 0;
-  _connecting = false;
-
+  _connecting             = false;
+  
   WiFi.mode(WIFI_AP_STA);
+  
   // start spiff
   if (!SPIFFS.begin())
   {
     // Serious problem
-    Serial.println(F("SPIFFS Mount failed"));
+    Serial.println(F("SPIFFS Mount failed."));
     return;
   } //end if
 }
 
 WifiTool::~WifiTool()
 {
-  for (auto entry : vektknownaps)
-  {
-    if (entry.ssid)
-    {
-      free(entry.ssid);
-    }
-    if (entry.passw)
-    {
-      free(entry.passw);
-    }
-  }
-  vektknownaps.clear();
+  _apscredit.clear();
 }
 
 /*
@@ -96,8 +86,9 @@ void WifiTool::process()
   wifiAutoConnect();
   if (_restartsystem)
   {
-    if (_restartsystem + 2000 < millis())
+    if ((unsigned long)millis()-_restartsystem > 60000)
     {
+      //Serial.println(F("Ujraindítom."));
       ESP.restart();
     } //end if
   }   //end if
@@ -108,21 +99,20 @@ void WifiTool::wifiAutoConnect()
   if (WiFi.status() != WL_CONNECTED && !_connecting)
   {
     Serial.println(F("\nNo WiFi connection."));
-    if (vektknownaps.at(_last_connected_network).ssid != "")
+    if(_apscredit[_last_connected_network].first!="")
     {
-      WiFi.begin(vektknownaps.at(_last_connected_network).ssid,
-                 vektknownaps.at(_last_connected_network).passw);
+      WiFi.begin(_apscredit[_last_connected_network].first,
+                _apscredit[_last_connected_network].second);          
     }
     _last_connect_atempt = millis();
     _connecting = true;
   }
-  else if (WiFi.status() != WL_CONNECTED && _connecting && (millis() > _last_connect_atempt + WAIT_FOR_WIFI_TIME_OUT))
+  else if (WiFi.status() != WL_CONNECTED && _connecting && (millis() - _last_connect_atempt > WAIT_FOR_WIFI_TIME_OUT))
   {
     if (++_last_connected_network >= 3)
       _last_connected_network = 0;
-
-    WiFi.begin(vektknownaps.at(_last_connected_network).ssid,
-                 vektknownaps.at(_last_connected_network).passw);
+    WiFi.begin(_apscredit[_last_connected_network].first,
+                _apscredit[_last_connected_network].second);
     _last_connect_atempt = millis();
   }
   else if (WiFi.status() == WL_CONNECTED && _connecting)
@@ -137,44 +127,6 @@ void WifiTool::wifiAutoConnect()
 
 } //end void
 
-/**
- *   connectAttempt(String ssid, String password)
- *  @param[in]    ssid connect to AP named as ssid 
- *                 If no ssid is passed then attempt to connect last known wifi
- *  @param[in]   password password
-*/
-
-/*
-    getJSONValueByKey(String textToSearch, String key)
-*/
-String WifiTool::getJSONValueByKey(String textToSearch, String key)
-{
-  if (textToSearch.length() == 0)
-  {
-    return String("");
-  }
-
-  String searchPhrase = String("\"");
-  searchPhrase.concat(key);
-  searchPhrase.concat("\":\"");
-  int fromPosition = textToSearch.indexOf(searchPhrase, 0);
-  if (fromPosition == -1)
-  {
-    // return because there is no status or it's null
-    return String("");
-  }
-
-  fromPosition = fromPosition + searchPhrase.length();
-  int toPosition = textToSearch.indexOf("\"", fromPosition);
-
-  if (toPosition == -1)
-  {
-    // return because there is no end quote
-    return String("");
-  }
-  textToSearch.remove(toPosition);
-  return textToSearch.substring(fromPosition);
-} //end get json by value
 
 /*
    getRSSIasQuality(int RSSI)
@@ -231,6 +183,19 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
   json = String();
 }
 
+void WifiTool::getNTPJson(AsyncWebServerRequest *request)
+{
+  String json=_sjsonp.fileToString("/ntp.json");
+  request->send(200, "application/json", json);
+}
+void WifiTool::getThingspeakJson(AsyncWebServerRequest *request)
+{
+  String json=_sjsonp.fileToString("/thingspeak.json");
+  request->send(200, "application/json", json);
+}
+
+
+
 /*
    handleGetSavSecreteJson()
 */
@@ -241,12 +206,12 @@ void WifiTool::handleGetSavSecreteJson(AsyncWebServerRequest *request)
   String jsonString = "{";
   jsonString.concat("\"APpassw\":\"");
   p = request->getParam("APpass", true);
-  jsonString.concat(p->value());
+  jsonString.concat(p->value().c_str());
   jsonString.concat("\",");
 
   jsonString.concat("\"ssid0\":\"");
   p = request->getParam("ssid0", true);
-  jsonString.concat(p->value());
+  jsonString.concat(p->value().c_str());
   jsonString.concat("\",");
 
   jsonString.concat("\"pass0\":\"");
@@ -277,22 +242,109 @@ void WifiTool::handleGetSavSecreteJson(AsyncWebServerRequest *request)
   File file = SPIFFS.open(SECRETS_PATH, "w");
   if (!file)
   {
-    Serial.println("Error opening file for writing");
+    Serial.println(F("Error opening file for writing"));
     return;
   }
   file.print(jsonString);
+  file.flush();
   file.close();
 
   request->send(200, "text/html", "<h1>Restarting .....</h1>");
   _restartsystem = millis();
 }
+
+void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
+{ 
+  
+  AsyncWebParameter *p;
+  String jsonString = "{";
+  jsonString.concat("\"NTPserver\":\"");
+  p = request->getParam("NTPserver", true);
+  jsonString.concat(p->value().c_str());
+  jsonString.concat("\",");
+
+  jsonString.concat("\"UTCh\":\"");
+  p = request->getParam("UTCh", true);
+  jsonString.concat(p->value().c_str());
+  jsonString.concat("\",");
+
+  jsonString.concat("\"UTCm\":\"");
+  p = request->getParam("UTCm", true);
+  jsonString.concat(p->value().c_str());
+  jsonString.concat("\",");
+
+  jsonString.concat("\"extratsh\":\"");
+  p = request->getParam("extratsh", true);
+  jsonString.concat(p->value());
+  jsonString.concat("\"}");
+
+  Serial.println(jsonString);
+
+  File file = SPIFFS.open("/ntp.json", "w");
+  if (!file)
+  {
+    Serial.println(F("Error opening file for writing"));
+    return;
+  }
+  file.print(jsonString);
+  file.flush();
+  file.close();
+  request->redirect("/wifi_NTP.html");
+}
+
+void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
+{ 
+  AsyncWebParameter *p;
+  String jsonString = "{";
+  jsonString.concat("\"ChannelID\":\"");
+  p = request->getParam("ChannelID", true);
+  jsonString.concat(p->value().c_str());
+  jsonString.concat("\",");
+
+  jsonString.concat("\"WriteAPIKey\":\"");
+  p = request->getParam("WriteAPIKey", true);
+  jsonString.concat(p->value().c_str());
+  jsonString.concat("\"}");
+
+  Serial.println(jsonString);
+
+  File file = SPIFFS.open("/thingspeak.json", "w");
+  if (!file)
+  {
+    Serial.println(F("Error opening file for writing"));
+    return;
+  }
+  file.print(jsonString);
+  file.flush();
+  file.close();
+  request->redirect("/wifi_thingspeak.html");
+}
+
+void WifiTool::handleSendTime(AsyncWebServerRequest *request)
+{
+  AsyncWebParameter *p;
+  p = request->getParam("time", true);
+  if(_strdt.epochTime==0 && p != nullptr)
+  {  
+    char atm[11];
+    memset(atm,0,11);
+    strncpy(atm,p->value().c_str(),10);
+    char* ptr;
+    unsigned long  b;
+    b=strtoul(atm, &ptr, 10);//string to unsigned long
+    b=_ntp.adjustTimeZone(b,_ntp.getUtcHour(),_ntp.getUtcMin(),_ntp.getSTDST());
+    _strdt=_ntp.ConvertUnixTimestamp(b);
+  }
+  request->send(200);
+}
+
 /**
   * setUpSTA()
   * Setup the Station mode
 */
 void WifiTool::setUpSTA()
 {
-  String json = filetoString(SECRETS_PATH);
+  String json = _sjsonp.fileToString(SECRETS_PATH);
   if (json == "" || json == nullptr)
   {
     Serial.println(F("Can't open the secret file."));
@@ -301,13 +353,11 @@ void WifiTool::setUpSTA()
 
   for (byte i = 0; i < 3; i++)
   {
-    String assid = getJSONValueByKey(json, "ssid" + String(i));
-    String apass = getJSONValueByKey(json, "pass" + String(i));
+    String assid = _sjsonp.getJSONValueByKeyFromString(json, "ssid" + String(i));
+    String apass = _sjsonp.getJSONValueByKeyFromString(json, "pass" + String(i));
 
-    knownapsstruct apstr;
-    apstr.ssid = strdup(assid.c_str());
-    apstr.passw = strdup(apass.c_str());
-    vektknownaps.push_back(apstr);
+    _apscredit.push_back(std::make_pair(assid,apass));
+
   } //end for
 }
 /**
@@ -318,20 +368,20 @@ void WifiTool::setUpSoftAP()
 {
   Serial.println(F("RUN AP"));
   dnsServer.reset(new DNSServer());
-  WiFi.softAP(DEF_AP_NAME,
-              getJSONValueByKey(filetoString(SECRETS_PATH),
-                                "APpassw")
-                  .c_str());
+  
   WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                     IPAddress(DEF_GATEWAY_IP),
                     IPAddress(DEF_SUBNETMASK));
+  WiFi.softAP(DEF_AP_NAME,_sjsonp.getJSONValueByKey(SECRETS_PATH,"APpassw"),1,0,4);
+  
+  
   delay(500);
 
   // Setup the DNS server redirecting all the domains to the apIP
   dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
   dnsServer->start(DEF_DNS_PORT, "*", IPAddress(DEF_DNS_IP));
 
-  //Serial.println("dns server config done");
+  Serial.println(F("DNS server started."));
 
 #if defined(ESP32)
   server.reset(new AsyncWebServer(80));
@@ -339,13 +389,22 @@ void WifiTool::setUpSoftAP()
   server.reset(new AsyncWebServer(80));
 #endif
 
-  Serial.print(F("SoftAP IP address: "));
+  Serial.print(F("SoftAP name and server IP address: "));
+  Serial.print(String(DEF_AP_NAME)+"  ");
   Serial.println(WiFi.softAPIP());
 
   server->serveStatic("/", SPIFFS, "/").setDefaultFile("/wifi_index.html");
 
   server->on("/saveSecret/", HTTP_ANY, [&, this](AsyncWebServerRequest *request) {
     handleGetSavSecreteJson(request);
+  });
+
+  server->on("/saveNTP/", HTTP_ANY, [&, this](AsyncWebServerRequest *request) {
+    handleSaveNTPJson(request);
+  });
+
+   server->on("/sendTime/", HTTP_POST, [&, this](AsyncWebServerRequest *request) {
+    handleSendTime(request);
   });
 
   server->on("/list", HTTP_ANY, [&, this](AsyncWebServerRequest *request) {
@@ -367,6 +426,14 @@ void WifiTool::setUpSoftAP()
 
   server->on("/wifiScan.json", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
     getWifiScanJson(request);
+  });
+
+  server->on("/ntp.json", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
+    getNTPJson(request);
+  });
+
+  server->on("/thingspeak.json", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
+    getThingspeakJson(request);
   });
 
   // Simple Firmware Update Form
@@ -419,18 +486,18 @@ void WifiTool::setUpSoftAP()
       });
 
   server->onNotFound([](AsyncWebServerRequest *request) {
-    Serial.println("handle not found+");
+    Serial.println("handle not found.");
     request->send(404);
   });
 
   server->addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER); //only when requested from AP
-  Serial.println(F("HTTP server started."));
+  Serial.println(F("HTTP webserver started."));
   server->begin();
 }
 
 void WifiTool::handleFileList(AsyncWebServerRequest *request)
 {
-  Serial.println("handle file list");
+  //Serial.println("handle file list");
   if (!request->hasParam("dir"))
   {
     request->send(500, "text/plain", "BAD ARGS");
@@ -439,7 +506,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
 
   AsyncWebParameter *p = request->getParam("dir");
   String path = p->value().c_str();
-  Serial.println("handleFileList: " + path);
+  //Serial.println("handleFileList: " + path);
   String output = "[";
 #if defined(ESP8266)
 
@@ -485,7 +552,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
 
   path = String();
   output += "]";
-  Serial.println(output);
+  //Serial.println(output);
   request->send(200, "application/json", output);
 }
 
@@ -539,39 +606,3 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
   }
 }
 
-String WifiTool::filetoString(const char *path)
-{
-  String content = "";
-
-  // start spiff
-  if (!SPIFFS.begin())
-  {
-    // Serious problem
-    Serial.println(F("SPIFFS Mount failed"));
-
-    return String("");
-  } //end if
-
-  //Serial.println(F("SPIFFS Mount succesfull"));
-
-  // read file
-  if (SPIFFS.exists(path))
-  {
-    File f = SPIFFS.open(path, "r");
-    if (!f)
-    {
-      Serial.println(F("file open failed"));
-      return String("");
-    } //end if
-
-    // read file
-
-    while (f.available())
-    {
-      content += char(f.read());
-    }
-    f.close();
-    return content; //f.readString();
-  }
-  return String("");
-}

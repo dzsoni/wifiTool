@@ -14,6 +14,7 @@
 #include <Arduino.h>
 #include <DNSServer.h>
 #include <vector>
+#include <utility>
 
 #include <ArduinoOTA.h>
 #ifdef ESP32
@@ -30,19 +31,16 @@
 
 #include <ESPAsyncWebServer.h>
 #include <SPIFFSEditor.h>
+#include <SimpleJsonParser.h>
+#include <NTPtimeESP.h>
 
 #include "definitions.h"
 
-struct knownapsstruct
-  {
-    char *ssid;
-    char *passw;
-  };
 
 class WifiTool
 {
 public:
-  WifiTool();
+  WifiTool(strDateTime &strdt_ , NTPtime &ntp_);
   ~WifiTool();
   void process();
   void begin();
@@ -50,10 +48,15 @@ public:
 private:
   void setUpSoftAP();
   void setUpSTA();
-  unsigned long _restartsystem;
-  unsigned long _last_connect_atempt;
-  bool  _connecting;
-  byte  _last_connected_network;
+  unsigned long     _restartsystem;
+  unsigned long     _last_connect_atempt;
+  bool              _connecting;
+  byte              _last_connected_network;
+  SimpleJsonParser  _sjsonp;
+  strDateTime&      _strdt;
+  NTPtime&          _ntp;
+  std::vector< std::pair <String,String> > _apscredit;
+  File              fsUploadFile;
 
   std::unique_ptr<DNSServer> dnsServer;
 #if defined(ESP32)
@@ -62,18 +65,19 @@ private:
   std::unique_ptr<AsyncWebServer> server;
 #endif
 
-  std::vector<knownapsstruct> vektknownaps;
-  File fsUploadFile;
-  String filetoString(const char *path);
-  String getJSONValueByKey(String textToSearch, String key);
-  void updateUpload();
-  void handleFileList(AsyncWebServerRequest *request);
-  void handleFileDelete(AsyncWebServerRequest *request);
-  void getWifiScanJson(AsyncWebServerRequest *request);
-  void handleGetSavSecreteJson(AsyncWebServerRequest *request);
-  int getRSSIasQuality(int RSSI);
-  void handleUpload(AsyncWebServerRequest *request, String filename, String redirect, size_t index, uint8_t *data, size_t len, bool final);
-  void wifiAutoConnect(); 
+  void  updateUpload();
+  void  handleFileList(AsyncWebServerRequest *request);
+  void  handleFileDelete(AsyncWebServerRequest *request);
+  void  getWifiScanJson(AsyncWebServerRequest *request);
+  void  getNTPJson(AsyncWebServerRequest *request);
+  void  getThingspeakJson(AsyncWebServerRequest *request);
+  void  handleGetSavSecreteJson(AsyncWebServerRequest *request);
+  void  handleSaveNTPJson(AsyncWebServerRequest *request);
+  void  handleSendTime(AsyncWebServerRequest *request);
+  void  handleSaveThingspeakJson(AsyncWebServerRequest *request);
+  int   getRSSIasQuality(int RSSI);
+  void  handleUpload(AsyncWebServerRequest *request, String filename, String redirect, size_t index, uint8_t *data, size_t len, bool final);
+  void  wifiAutoConnect(); 
 };
 
 #endif
