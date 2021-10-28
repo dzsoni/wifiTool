@@ -298,7 +298,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
 
   Serial.println(jsonString);
 
-  File file = SPIFFS.open("/ntp.json", "w");
+  File file = SPIFFS.open(F("/ntp.json"), "w");
   if (!file)
   {
     Serial.println(F("Error opening file for writing"));
@@ -308,7 +308,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
   file.flush();
   file.close();
   
-  request->redirect("/wifi_NTP.html");
+  request->redirect(F("/wifi_NTP.html"));
 }
 
 void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
@@ -327,7 +327,7 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
 
   Serial.println(jsonString);
 
-  File file = SPIFFS.open("/thingspeak.json", "w");
+  File file = SPIFFS.open(F("/thingspeak.json"), "w");
   if (!file)
   {
     Serial.println(F("Error opening file for writing"));
@@ -336,7 +336,7 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
   file.print(jsonString);
   file.flush();
   file.close();
-  request->redirect("/wifi_thingspeak.html");
+  request->redirect(F("/wifi_thingspeak.html"));
 }
 
 void WifiTool::handleSendTime(AsyncWebServerRequest *request)
@@ -505,7 +505,7 @@ void WifiTool::setUpSoftAP()
       });
 
   server->onNotFound([](AsyncWebServerRequest *request) {
-    Serial.println("handle not found.");
+    Serial.println(F("Handle not found."));
     request->send(404);
   });
 
@@ -577,7 +577,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
 
 void WifiTool::handleFileDelete(AsyncWebServerRequest *request)
 {
-  Serial.println("in file delete");
+  Serial.println(F("in file delete"));
   if (request->params() == 0)
   {
     return request->send(500, "text/plain", "BAD ARGS");
@@ -619,7 +619,7 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
   }
   if (final)
   {
-    Serial.println((String) "UploadEnd: " + filename);
+    Serial.println(F("UploadEnd: ") + filename);
     fsUploadFile.close();
     request->redirect(redirect);
   }
