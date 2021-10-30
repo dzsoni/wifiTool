@@ -88,7 +88,7 @@ void WifiTool::process()
   wifiAutoConnect();
   if (_restartsystem)
   {
-    if ((unsigned long)millis()-_restartsystem > 60000)
+    if ((unsigned long)millis()-_restartsystem > 10000)
     {
       //Serial.println(F("Ujraindítom."));
       ESP.restart();
@@ -185,16 +185,7 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
   json = String();
 }
 
-void WifiTool::getNTPJson(AsyncWebServerRequest *request)
-{
-  String json=_sjsonp.fileToString("/ntp.json");
-  request->send(200, "application/json", json);
-}
-void WifiTool::getThingspeakJson(AsyncWebServerRequest *request)
-{
-  String json=_sjsonp.fileToString("/thingspeak.json");
-  request->send(200, "application/json", json);
-}
+
 
 
 
@@ -207,52 +198,55 @@ void WifiTool::handleGetSavSecreteJson(AsyncWebServerRequest *request)
   AsyncWebParameter *p;
   String jsonString = "{";
   jsonString.concat("\"APpassw\":\"");
-  p = request->getParam("APpass", true);
-  jsonString.concat(p->value().c_str());
+  p = request->getParam("APpass", true, false);
+  jsonString.concat(p->value());
   jsonString.concat("\",");
-
+  
   jsonString.concat("\"ssid0\":\"");
   p = request->getParam("ssid0", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
 
   jsonString.concat("\"pass0\":\"");
   p = request->getParam("pass0", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
-
+  
   jsonString.concat("\"ssid1\":\"");
   p = request->getParam("ssid1", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
-
+  
   jsonString.concat("\"pass1\":\"");
   p = request->getParam("pass1", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
+  
 
   jsonString.concat("\"ssid2\":\"");
   p = request->getParam("ssid2", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
+  
 
   jsonString.concat("\"pass2\":\"");
   p = request->getParam("pass2", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\"}");
-
+  
   File file = SPIFFS.open(SECRETS_PATH, "w");
   if (!file)
   {
     Serial.println(F("Error opening file for writing"));
     return;
   }
+  
   file.print(jsonString);
   file.flush();
   file.close();
 
-  request->send(200, "text/html", "<h1>Restarting .....</h1>");
-  _restartsystem = millis();
+  setWifiIdetifiersfromString(jsonString);
+  request->redirect(F("/wifi_manager.html"));
 }
 
 void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
@@ -262,7 +256,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
   String jsonString = "{";
   jsonString.concat("\"NTPserver\":\"");
   p = request->getParam("NTPserver", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
 
   jsonString.concat("\"UTCh\":\"");
@@ -279,7 +273,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
 
   jsonString.concat("\"extratsh\":\"");
   p = request->getParam("extratsh", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
 
 		if (p->value() == "ST")
 		{
@@ -298,7 +292,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
 
   Serial.println(jsonString);
 
-  File file = SPIFFS.open("/ntp.json", "w");
+  File file = SPIFFS.open(F("/ntp.json"), "w");
   if (!file)
   {
     Serial.println(F("Error opening file for writing"));
@@ -308,7 +302,7 @@ void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
   file.flush();
   file.close();
   
-  request->redirect("/wifi_NTP.html");
+  request->redirect(F("/wifi_NTP.html"));
 }
 
 void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
@@ -317,17 +311,17 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
   String jsonString = "{";
   jsonString.concat("\"ChannelID\":\"");
   p = request->getParam("ChannelID", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\",");
-
+  
   jsonString.concat("\"WriteAPIKey\":\"");
   p = request->getParam("WriteAPIKey", true);
-  jsonString.concat(p->value().c_str());
+  jsonString.concat(p->value());
   jsonString.concat("\"}");
 
   Serial.println(jsonString);
 
-  File file = SPIFFS.open("/thingspeak.json", "w");
+  File file = SPIFFS.open(F("/thingspeak.json"), "w");
   if (!file)
   {
     Serial.println(F("Error opening file for writing"));
@@ -336,7 +330,7 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
   file.print(jsonString);
   file.flush();
   file.close();
-  request->redirect("/wifi_thingspeak.html");
+  request->redirect(F("/wifi_thingspeak.html"));
 }
 
 void WifiTool::handleSendTime(AsyncWebServerRequest *request)
@@ -369,16 +363,23 @@ void WifiTool::setUpSTA()
     Serial.println(F("Can't open the secret file."));
     return;
   }
-
+  setWifiIdetifiersfromString(json);
+}
+//Set  Wifi Access Points identifiers.
+void WifiTool::setWifiIdetifiersfromString (String& str)
+{
+  _apscredit.clear();
   for (byte i = 0; i < 3; i++)
   {
-    String assid = _sjsonp.getJSONValueByKeyFromString(json, "ssid" + String(i));
-    String apass = _sjsonp.getJSONValueByKeyFromString(json, "pass" + String(i));
+    String assid = _sjsonp.getJSONValueByKeyFromString(str, "ssid" + String(i));
+    String apass = _sjsonp.getJSONValueByKeyFromString(str, "pass" + String(i));
 
     _apscredit.push_back(std::make_pair(assid,apass));
-
   } //end for
+  _apscredit.shrink_to_fit();
 }
+
+
 /**
   * setUpSoftAP()
   * Setting up the SoftAP Service
@@ -422,6 +423,10 @@ void WifiTool::setUpSoftAP()
     handleSaveNTPJson(request);
   });
 
+  server->on("/saveThingspeak/", HTTP_ANY, [&, this](AsyncWebServerRequest *request) {
+    handleSaveThingspeakJson(request);
+  });
+
    server->on("/sendTime/", HTTP_POST, [&, this](AsyncWebServerRequest *request) {
     handleSendTime(request);
   });
@@ -447,13 +452,6 @@ void WifiTool::setUpSoftAP()
     getWifiScanJson(request);
   });
 
-  server->on("/ntp.json", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
-    getNTPJson(request);
-  });
-
-  server->on("/thingspeak.json", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
-    getThingspeakJson(request);
-  });
 
   // Simple Firmware Update Form
   server->on("/update", HTTP_GET, [&, this](AsyncWebServerRequest *request) {
@@ -505,7 +503,7 @@ void WifiTool::setUpSoftAP()
       });
 
   server->onNotFound([](AsyncWebServerRequest *request) {
-    Serial.println("handle not found.");
+    Serial.println(F("Handle not found."));
     request->send(404);
   });
 
@@ -577,7 +575,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
 
 void WifiTool::handleFileDelete(AsyncWebServerRequest *request)
 {
-  Serial.println("in file delete");
+  Serial.println(F("in file delete"));
   if (request->params() == 0)
   {
     return request->send(500, "text/plain", "BAD ARGS");
@@ -619,7 +617,7 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
   }
   if (final)
   {
-    Serial.println((String) "UploadEnd: " + filename);
+    Serial.println(F("UploadEnd: ") + filename);
     fsUploadFile.close();
     request->redirect(redirect);
   }

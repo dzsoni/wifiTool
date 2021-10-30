@@ -69,15 +69,14 @@ private:
   void  handleFileList(AsyncWebServerRequest *request);
   void  handleFileDelete(AsyncWebServerRequest *request);
   void  getWifiScanJson(AsyncWebServerRequest *request);
-  void  getNTPJson(AsyncWebServerRequest *request);
-  void  getThingspeakJson(AsyncWebServerRequest *request);
   void  handleGetSavSecreteJson(AsyncWebServerRequest *request);
   void  handleSaveNTPJson(AsyncWebServerRequest *request);
   void  handleSendTime(AsyncWebServerRequest *request);
   void  handleSaveThingspeakJson(AsyncWebServerRequest *request);
   int   getRSSIasQuality(int RSSI);
   void  handleUpload(AsyncWebServerRequest *request, String filename, String redirect, size_t index, uint8_t *data, size_t len, bool final);
-  void  wifiAutoConnect(); 
+  void  wifiAutoConnect();
+  void  setWifiIdetifiersfromString(String& str); 
 };
 
 #endif
