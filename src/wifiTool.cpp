@@ -605,8 +605,9 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
 {
   if (!index)
   {
-    if (!filename.startsWith("/"))
+    if (!filename.startsWith("/")) 
       filename = "/" + filename;
+
     Serial.println((String) "UploadStart: " + filename);
     fsUploadFile = SPIFFS.open(filename, "w"); // Open the file for writing in SPIFFS (create if it doesn't exist)
   }
