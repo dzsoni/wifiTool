@@ -12,6 +12,12 @@
 #include "wifiTool.h"
 #include <stdlib.h>
 #include <string>
+#include <vector>
+#include <utility>
+
+extern "C" uint32_t _FS_start;
+extern "C" uint32_t _FS_end;
+extern String getVersion();
 
 /*
     class CaptiveRequestHandler
@@ -54,8 +60,7 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
-WifiTool::WifiTool( AsyncWebServer& server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp_) :
-           _server (server),_sh(sol), _strdt(strdt), _ntp(ntp_)
+WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp_) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp_)
 {
     _restartsystem = 0;
     _last_connect_atempt = 0;
@@ -189,16 +194,17 @@ void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
 {
     ENUM_NBD_ERROR err = NBD_NO_ERRROR;
     int s_count = 0;
-    unsigned int i=0;
+    unsigned int i = 0;
     String jsonString = "{";
-    for (auto  w = 0; w < _sh->wire.size(); w++)
+    for (auto w = 0; w < _sh->wire.size(); w++)
     {
-        i=0;
-        if( !(!w && !i)) jsonString += ",";
+        i = 0;
+        if (!(!w && !i))
+            jsonString += ",";
         jsonString += "\"s";
         jsonString += s_count;
         jsonString += "\":[";
-        for ( i=0 ; i < _sh->wire.at(w)->getSensorsCount(); i++)
+        for (i = 0; i < _sh->wire.at(w)->getSensorsCount(); i++)
         {
             String gpio = (String)_sh->wire.at(w)->getGPIO();
 
@@ -210,13 +216,13 @@ void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
             float temp = _sh->wire.at(w)->getTempByIndex(i, err);
 
             String unitM;
-            if(_sh->wire.at(w)->getUnitsOfMeasure()=="C")
+            if (_sh->wire.at(w)->getUnitsOfMeasure() == "C")
             {
-                unitM="\u2103";
+                unitM = "\u2103";
             }
             else
             {
-                unitM="\u2109";
+                unitM = "\u2109";
             }
 
             jsonString += "\"";
@@ -272,34 +278,47 @@ void WifiTool::handleGetUnknownSenors(AsyncWebServerRequest *request)
 
 void WifiTool::handleSaveSensorInventory(AsyncWebServerRequest *request)
 {
-    AsyncWebParameter *p = nullptr;
-    String json = "{";
-    unsigned int count = 0;
-    String a = "h" + String(count);
-    p = request->getParam(a, true, false);
-    _WIFITOOL_PL(a);
-    while (p != nullptr)
+    std::vector<std::pair<String, String>> listA;
+    std::vector<std::pair<String, String> *> listB;
+    if (request->params() > 0)
     {
+        for (unsigned int i = 0; i < request->args(); i = i + 2)
+        {
+            listA.emplace_back(std::make_pair(String{request->arg(i)},
+                                              String{request->arg(i + 1)}));
+        }
 
-        json += "\"";
-        a = "h" + String(count);
-        p = request->getParam(a, true, false); //hidden input
-        json.concat(p->value());
-        _WIFITOOL_PL(a);
-        json.concat("\":\"");
-        a = "n" + String(count);
-        p = request->getParam(a, true, false); //name
-        json.concat(p->value());
-        _WIFITOOL_PL(a);
-        json += "\"";
-        count++;
-        a = "h" + String(count);
-        p = request->getParam(a, true, false);
-        if (p != nullptr)
+        for (unsigned int i = 0; i < listA.size() - 1; i++)
+        {
+            if (listA.at(i).second == "")
+                continue;
+            boolean found = false;
+            for (unsigned int j = i + 1; j < listA.size(); j++)
+            {
+                if (listA.at(i).second == listA.at(j).second)
+                    found = true;
+            }
+            if (!found)
+                listB.emplace_back(&listA.at(i));
+        }
+        if (listA.size() > 0)
+        {
+            if (listA.at(listA.size() - 1).second != "")
+                listB.emplace_back(&listA.at(listA.size() - 1));
+        }
+    }
+    String json = "{";
+    for (unsigned int i = 0; i < listB.size(); i++)
+    {
+        if (i != 0)
             json += ",";
+        json += "\"";
+        json += listB.at(i)->first;
+        json += "\":\"";
+        json += listB.at(i)->second;
+        json += "\"";
     }
     json += "}";
-
     File file = SPIFFS.open("/sensnames.json", "w");
     if (!file)
     {
@@ -319,41 +338,33 @@ void WifiTool::handleSaveSensorInventory(AsyncWebServerRequest *request)
 */
 void WifiTool::handleGetSaveSecretJson(AsyncWebServerRequest *request)
 {
-    AsyncWebParameter *p;
     String jsonString = "{";
     jsonString.concat("\"APpassw\":\"");
-    p = request->getParam("APpass", true, false);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("APpass")));
     jsonString.concat("\",");
 
     jsonString.concat("\"ssid0\":\"");
-    p = request->getParam("ssid0", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("ssid0")));
     jsonString.concat("\",");
 
     jsonString.concat("\"pass0\":\"");
-    p = request->getParam("pass0", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("pass0")));
     jsonString.concat("\",");
 
     jsonString.concat("\"ssid1\":\"");
-    p = request->getParam("ssid1", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("ssid1")));
     jsonString.concat("\",");
 
     jsonString.concat("\"pass1\":\"");
-    p = request->getParam("pass1", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("pass1")));
     jsonString.concat("\",");
 
     jsonString.concat("\"ssid2\":\"");
-    p = request->getParam("ssid2", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("ssid2")));
     jsonString.concat("\",");
 
     jsonString.concat("\"pass2\":\"");
-    p = request->getParam("pass2", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(F("pass2")));
     jsonString.concat("\"}");
 
     File file = SPIFFS.open(SECRETS_PATH, "w");
@@ -373,35 +384,33 @@ void WifiTool::handleGetSaveSecretJson(AsyncWebServerRequest *request)
 
 void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
 {
+    String extratsh = String(F("extratsh"));
+    String UTCm = String(F("UTCm"));
+    String UTCh = String(F("UTCh"));
 
-    AsyncWebParameter *p;
     String jsonString = "{";
     jsonString.concat("\"NTPserver\":\"");
-    p = request->getParam("NTPserver", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg("NTPserver"));
     jsonString.concat("\",");
 
     jsonString.concat("\"UTCh\":\"");
-    p = request->getParam("UTCh", true);
-    jsonString.concat(p->value().c_str());
-    _ntp.setUtcHour((int8_t)p->value().toInt());
+    jsonString.concat(request->arg(UTCh));
+    _ntp.setUtcHour((int8_t)request->arg(UTCh).toInt());
     jsonString.concat("\",");
 
     jsonString.concat("\"UTCm\":\"");
-    p = request->getParam("UTCm", true);
-    jsonString.concat(p->value().c_str());
-    _ntp.setUtcMin((uint8_t)abs(p->value().toInt()));
+    jsonString.concat(request->arg(UTCm));
+    _ntp.setUtcMin((uint8_t)abs(request->arg(UTCm).toInt()));
     jsonString.concat("\",");
 
     jsonString.concat("\"extratsh\":\"");
-    p = request->getParam("extratsh", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg(extratsh));
 
-    if (p->value() == "ST")
+    if (request->arg(extratsh) == "ST")
     {
         _ntp.setSTDST(1); //Summer Time
     }
-    else if (p->value() == "DST")
+    else if (request->arg(extratsh) == "DST")
     {
         _ntp.setSTDST(2); //Daylight Saving Time
     }
@@ -437,16 +446,13 @@ void WifiTool::handleRescanWires(AsyncWebServerRequest *request)
 
 void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
 {
-    AsyncWebParameter *p;
     String jsonString = "{";
     jsonString.concat("\"ChannelID\":\"");
-    p = request->getParam("ChannelID", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg("ChannelID"));
     jsonString.concat("\",");
 
     jsonString.concat("\"WriteAPIKey\":\"");
-    p = request->getParam("WriteAPIKey", true);
-    jsonString.concat(p->value());
+    jsonString.concat(request->arg("WriteAPIKey"));
     jsonString.concat("\"}");
 
     _WIFITOOL_PL(jsonString);
@@ -476,7 +482,7 @@ void WifiTool::handleSendTime(AsyncWebServerRequest *request)
         unsigned long b;
         b = strtoul(atm, &ptr, 10); //string to unsigned long
         b = _ntp.adjustTimeZone(b, _ntp.getUtcHour(), _ntp.getUtcMin(), _ntp.getSTDST());
-        _strdt = _ntp.ConvertUnixTimestamp(b);
+        _strdt.setFromUnixTimestamp(b);
     }
     request->send(200);
 }
@@ -581,57 +587,7 @@ void WifiTool::setUpSoftAP()
 
     _server.on("/getunknownsenses.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
                { handleGetUnknownSenors(request); });
-
-    // Simple Firmware Update Form
-    _server.on("/update", HTTP_GET, [&, this](AsyncWebServerRequest *request)
-               { request->send(SPIFFS, "/wifi_upload.html"); });
-    _server.on(
-        "/update", HTTP_POST, [&, this](AsyncWebServerRequest *request)
-        {
-            uint8_t isSuccess = !Update.hasError();
-
-            AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", isSuccess ? "OK" : "FAIL");
-            response->addHeader("Connection", "close");
-            request->send(response);
-        },
-        [&, this](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
-        {
-            if (!index)
-            {
-                Serial.printf("Update Start: %s\n", filename.c_str());
-
-#if defined(ESP8266)
-                Update.runAsync(true);
-                if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
-                {
-                    Update.printError(Serial);
-                }
-#else
-                if (!Update.begin(UPDATE_SIZE_UNKNOWN))
-                {
-                    Update.printError(Serial);
-                }
-#endif
-            }
-            if (!Update.hasError())
-            {
-                if (Update.write(data, len) != len)
-                {
-                    Update.printError(Serial);
-                }
-            }
-            if (final)
-            {
-                if (Update.end(true))
-                {
-                    Serial.printf("Update Success: %uB\n", index + len);
-                }
-                else
-                {
-                    Update.printError(Serial);
-                }
-            }
-        });
+  
 
     _server.onNotFound([](AsyncWebServerRequest *request)
                        {
@@ -712,8 +668,8 @@ void WifiTool::handleFileDelete(AsyncWebServerRequest *request)
     {
         return request->send(500, "text/plain", "BAD ARGS");
     }
-    AsyncWebParameter *p = request->getParam(0);
-    String path = p->value();
+
+    String path = String(request->arg(0u));
 
     Serial.println("handleFileDelete: " + path);
     if (path == "/")
@@ -731,7 +687,7 @@ void WifiTool::handleFileDelete(AsyncWebServerRequest *request)
     path = String();
 }
 
-void WifiTool:: handleFileDownload(AsyncWebServerRequest *request)
+void WifiTool::handleFileDownload(AsyncWebServerRequest *request)
 {
     if (request->params() == 0)
     {
@@ -740,7 +696,7 @@ void WifiTool:: handleFileDownload(AsyncWebServerRequest *request)
 
     AsyncWebParameter *p = request->getParam(0);
     String s = p->value();
-    String path="/"+s;
+    String path = "/" + s;
     Serial.println("handleFileDownload: " + path);
     if (path == "/")
     {
@@ -753,11 +709,9 @@ void WifiTool:: handleFileDownload(AsyncWebServerRequest *request)
     }
     AsyncWebServerResponse *response = request->beginResponse(SPIFFS, path, String(), true);
 
-   // request->send(SPIFFS, path, "application/x-download", true);
-  
-   request->send(response);
+    // request->send(SPIFFS, path, "application/x-download", true);
 
-
+    request->send(response);
 }
 //==============================================================
 //   handleUpload
