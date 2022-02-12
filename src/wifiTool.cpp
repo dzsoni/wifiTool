@@ -486,6 +486,11 @@ void WifiTool::handleSendTime(AsyncWebServerRequest *request)
     }
     request->send(200);
 }
+void  WifiTool::handleGetVersion(AsyncWebServerRequest *request)
+{
+ _WIFITOOL_PL("Send version:"+ getVersion());
+ request->send(200, "text/plain", "Version:"+getVersion());
+}
 
 /**
   * setUpSTA()
@@ -587,6 +592,9 @@ void WifiTool::setUpSoftAP()
 
     _server.on("/getunknownsenses.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
                { handleGetUnknownSenors(request); });
+
+    _server.on("/getversion", HTTP_GET, [&, this](AsyncWebServerRequest *request)
+               { handleGetVersion(request); });
   
 
     _server.onNotFound([](AsyncWebServerRequest *request)
