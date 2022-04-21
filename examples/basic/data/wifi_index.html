@@ -1,18 +1,44 @@
-<!-- index.html -->
 <!DOCTYPE html>
 
 <html>
 <head>
-	<title>ESP8266 & ESP32 Management Portal</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP8266 & ESP32 Management Portal</title>
+<style type="text/css">
+* {
+  box-sizing: border-box;
+}
+h1 {
+    text-align: center;
+	font-size: minmax(7vmin,7vmin);
+}
+ .grid-container {
+  font-size: minmax(5vmin,5vmin);
+  display:grid;
+  grid-template-columns: 
+	  repeat(auto-fill,
+		  minmax(5em,1fr));
+  grid-gap: 1%;
+  grid-row-gap: 10px;
+}
+	button {
+		padding:0.5em;
+	}
+</style>
+
 </head>
 
-<body> 
-
+<body>
+	
 <h1>ESP8266 & ESP32 Management Portal</h1>
-
+	
+<div class="grid-container">
 <button onclick= "window.location.href = '/wifi_manager.html'"> Wifi Setup </button>
-<button onclick= "window.location.href = '/wifi_upload.html'"> OTA </button>
-<button onclick= "window.location.href = '/wifi_spiffs_admin.html'"> SPIFFS Manger</button>
+<button onclick= "window.location.href = '/update'"> OTA </button>
+<button onclick= "window.location.href = '/wifi_spiffs_admin.html'"> SPIFFS Manager</button>
+</div>
+<p id="version"></p>
 
 </body>
 </html>

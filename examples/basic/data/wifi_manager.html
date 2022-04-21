@@ -1,9 +1,11 @@
-<!-- wifi_manager.html -->
 <!DOCTYPE html>
 
 <html>
 <head>
-	<title>ESP8266 & ESP32 Management Portal</title>
+<title>ESP8266 & ESP32 Management Portal</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="base.css" rel="stylesheet" type="text/css">
 
 <script>
 function getWifiScanJson() {
@@ -31,9 +33,9 @@ function getSecretJson() {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      //document.getElementById("LEDState").innerHTML =
 	  var obj =  JSON.parse(this.responseText);
-	  for (var i=1; i <4; i++) {
+	  document.getElementById("APpass").value=obj['APpassw'];
+	  for (var i=0; i <3; i++) {
 		document.getElementById("ssid" + i).value = obj['ssid'+i];
 		document.getElementById("pass" + i).value = obj['pass'+i];
 	  }
@@ -42,57 +44,97 @@ function getSecretJson() {
   };
   xhttp.open("GET", "secrets.json", true);
   xhttp.send();
- }
-
- 
- function showPassword(id) {
+ } 
+function showPassword(id) {
   var x = document.getElementById(id);
-  if (x.type === "password") {
+  if (x.type == "password") {
     x.type = "text";
   } else {
     x.type = "password";
   }
 }
-</script> 
-
-<style>
-<!--tbd-->
-</style>
- 
+//oninput event
+function checkpw(event) {
+ x = event.target.value;
+ if (!rightpwlen(x)){
+  document.getElementById(event.target.id+"w").innerHTML = "min.8 max.64 char !"; 
+  }
+  else{
+  document.getElementById(event.target.id+"w").innerHTML = ""; 
+  }
+}
+function rightpwlen (x){
+	if (x.length<8 || x.length >64){
+  return false;
+  }
+  else{
+  return true;
+  }
+}
+</script>
 </head>
 
-
 <body>
-
-<h1><b>ESP8266 & ESP32 Management Portal - WiFi Setup</b></h1><BR>
-
-<form action="/saveSecret/" method="POST" >
-	<label>ssid1:</label>
-	<input type="text" id="ssid1" name="ssid1" maxlength="32" size="16">
-	<label>password1:</label>
-	<input type="password" id="pass1" name="pass1"  maxlength="64" size="16">
-	<!-- An element to toggle between password visibility -->
-	<input type="checkbox" onclick="showPassword('pass1')">Show Password
-	<BR>
-	<label>ssid2:</label>
-	<input type="text" id="ssid2" name="ssid2" maxlength="32" size="16">
-	<label>password2:</label>
-	<input type="password" id="pass2" name="pass2" maxlength="64" size="16">
-	<!-- An element to toggle between password visibility -->
-	<input type="checkbox" onclick="showPassword('pass2')">Show Password
-	<BR>
-	<label>ssid3:</label>
-	<input type="text" id="ssid3" name="ssid3" maxlength="32" size="16">
-	<label>password3:</label>
-	<input type="password" id="pass3" name="pass3"  maxlength="64" size="16">
-	<input type="checkbox" onclick="showPassword('pass3')">Show Password
-	<BR>
-	<!-- Clear form -->
-	<input type="reset" value="Clear"/>
-	<input type="submit" value="Save"/>
+<h1>ESP8266 & ESP32 Management Portal - WiFi Setup</h1>
+<form action="/saveSecret/" method="POST">
+  <div class="contA">
+    <div class="contB">
+      <label for="APpass">APpassword:</label>
+      <input type="password" id="APpass" name="APpass" maxlength="64" oninput="checkpw(event)">
+    </div>
+    <div class="contB">
+      <input type="checkbox" onclick="showPassword('APpass')">
+      Show Password <span id="APpassw" style="color:red"></span>
+	</div>
+  </div>
+  <div class="contA">
+    <div class="contB">
+      <label for="ssid0">ssid1:</label>
+      <input type="text" id="ssid0" name="ssid0" maxlength="32" >
+    </div>
+    <div class="contB">
+      <label for="pass0">password1:</label>
+      <input type="password" id="pass0" name="pass0" maxlength="64" size="10" oninput="checkpw(event)">
+    </div>
+    <div class="contB">
+      <input type="checkbox" onclick="showPassword('pass0')">
+      <label>Show Password <span id="pass0w" style="color:red"></span></label>
+    </div>
+  </div>
+  <div class="contA">
+    <div class="contB">
+      <label>ssid2:</label>
+      <input type="text" id="ssid1" name="ssid1" maxlength="32" >
+    </div>
+    <div class="contB">
+      <label>password2:</label>
+      <input type="password" id="pass1" name="pass1" maxlength="64" size="10" oninput="checkpw(event)">
+    </div>
+    <div class="contB">
+      <input type="checkbox" onclick="showPassword('pass1')">
+      <label>Show Password <span id="pass1w" style="color:red"></span></label>
+    </div>
+  </div>
+  <div class="contA">
+    <div class="contB">
+      <label>ssid3:</label>
+      <input type="text" id="ssid2" name="ssid2" maxlength="32">
+    </div>
+    <div class="contB">
+      <label>password3:</label>
+      <input type="password" id="pass2"  name="pass2" maxlength="64" size="10" oninput="checkpw(event)">
+    </div>
+    <div class="contB">
+      <input type="checkbox" onclick="showPassword('pass2')">
+      <label>Show Password <span id="pass2w" style="color:red"></span></label>
+    </div>
+  </div>
+  
+  <!-- Clear form -->
+  <input type="reset" value="Clear"/>
+  <input type="submit" value="Save"/>
 </form>
 <button onClick="getWifiScanJson()">Wifi Scan</button>
-<div id="wifilist"></div>
 <script>
 getSecretJson();
 </script>

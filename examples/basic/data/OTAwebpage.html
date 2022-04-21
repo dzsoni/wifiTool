@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ESP8266 & ESP32 BasicOTA</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type="text/css">
+        h1 {
+            text-align: center;
+            font-size: 5vmax;
+        }
+
+        .contB {
+            padding: 0.1em;
+            font-size: 3vmax;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ESP8266 & ESP32 BasicOTA</h1>
+    <form method="POST" action="/update" enctype="multipart/form-data" id="upload_form">
+        <div class="contB">
+            <input type="radio" id="firmware" name="firmwaretype" value="firmware" checked />
+            <label for="firmware">firmware</label>
+            <input type="radio" id="filesystem" name="firmwaretype" value="filesystem" />
+            <label for="filesystem">filesystem</label>
+        </div>
+        <div class="contB">
+            <input type="file" id="ufile" name="ufile" />
+            <input type="submit" value="Update" />
+        </div>
+    </form>
+    <div id="prg"></div>
+
+    <script>
+        document
+            .getElementById("upload_form")
+            .addEventListener("submit", function (e) {
+                e.preventDefault();
+                uploadFile();
+            });
+
+        function uploadFile() {
+            if (document.getElementById("ufile").files.length == 0) {
+                document.getElementById("prg").innerHTML = "No file selected.";
+                return;
+            }
+            var file = document.getElementById("ufile").files[0];
+            // alert(file.name+" | "+file.size+" | "+file.type);
+            let formdata = new FormData();
+            let c = document.querySelector(
+                "input[name = firmwaretype ]:checked"
+            ).value;
+            formdata.append("firmwaretype", c);
+
+            formdata.append("ufile", file);
+            var ajax = new XMLHttpRequest();
+            ajax.onreadystatechange = function() {
+            if (this.readyState == 4 && (this.status == 200 || this.status==500 ))
+             {
+                document.getElementById("prg").innerHTML = this.responseText;
+	         }
+            };
+
+            ajax.upload.addEventListener("progress", progressHandler, false);
+            ajax.upload.addEventListener("loadend", transferComplete, false);
+            ajax.upload.addEventListener("load", transferComplete, false);
+            ajax.upload.addEventListener("error", errorHandler, false);
+            ajax.upload.addEventListener("abort", abortHandler, false);
+            ajax.open("POST", "/update");
+            ajax.send(formdata);
+        }
+
+        function progressHandler(event) {
+            var percent = (event.loaded / event.total) * 100;
+            document.getElementById("prg").innerHTML =
+                "Uploaded " +
+                event.loaded +
+                " bytes of " +
+                event.total +
+                " " +
+                Math.round(percent) +
+                "% uploaded... please wait";
+        }
+
+        function transferComplete(event) {
+            document.getElementById("prg").innerHTML ="Upload success. Restarting...";
+            document.getElementById("upload_form").reset();
+        }
+
+        function errorHandler(event) {
+            document.getElementById("prg").innerHTML = "Upload Failed.";
+        }
+
+        function abortHandler(event) {
+            document.getElementById("prg").innerHTML = "Upload Aborted.";
+        }
+    </script>
+</body>
+</html>
