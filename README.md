@@ -66,7 +66,7 @@ This page allows you to set up to 3 router/password for the system to check for 
 Once save is hit, the file gets re-written and the ESP will restart and try connecting using the new data.
 
 ## OTA
-Pre compile the firmware on your computer and use this page to upload and flash a new firmware to the ESP.(The OTAwebpage.htm run from program memory so its not necessary upload to SPIFFS.)
+Pre compile the firmware on your computer and use this page to upload and flash a new firmware to the ESP.(The OTAwebpage.htm run from program memory so its not necessary upload to SPIFFS. It's provided for source code.)
 
 ## SPIFFS Manager
 Allow you to browse, upload, download or delete files from the SPIFSS, note not to delete any system files :) 
