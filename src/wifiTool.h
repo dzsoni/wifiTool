@@ -33,11 +33,13 @@
 #include <SimpleJsonParser.h>
 #include <NTPtimeESP.h>
 #include <struct_solarhardwares.h>
+#include <Wire.h>
+#include <RtcDS3231.h>
 
 
 #include "definitions.h"
 
-#define  DEBUG_WIFITOOL 
+//#define  DEBUG_WIFITOOL 
 
 #ifdef DEBUG_WIFITOOL
 #define _WIFITOOL_PP(a) Serial.print(a);
@@ -53,7 +55,7 @@
 class WifiTool
 {
 public:
-  WifiTool(AsyncWebServer& server, struct_solarhardwares* sol, strDateTime &strdt_ , NTPtime &ntp_);
+  WifiTool(AsyncWebServer& server, struct_solarhardwares* sol, strDateTime &strdt_ , NTPtime &ntp_, RtcDS3231<TwoWire>& rtc );
   ~WifiTool();
   void process();
   void begin();
@@ -61,16 +63,17 @@ public:
 private:
   void setUpSoftAP();
   void setUpSTA();
-  unsigned long     _restartsystem;
-  unsigned long     _last_connect_atempt;
-  bool              _connecting;
-  byte              _last_connected_network;
-  SimpleJsonParser  _sjsonp;
-  strDateTime&      _strdt;
-  NTPtime&          _ntp;
+  unsigned long         _restartsystem;
+  unsigned long         _last_connect_atempt;
+  bool                  _connecting;
+  byte                  _last_connected_network;
+  SimpleJsonParser      _sjsonp;
+  strDateTime&          _strdt;
+  NTPtime&               _ntp;
+  RtcDS3231<TwoWire>&    _rtc;
   struct_solarhardwares* _sh;
   std::vector< std::pair <String,String> > _apscredit;
-  File              fsUploadFile;
+  File                    _fsUploadFile;
 
   std::unique_ptr<DNSServer> dnsServer;
   AsyncWebServer& _server;
@@ -94,6 +97,7 @@ private:
   void  handleSaveSensorInventory(AsyncWebServerRequest *request);
   void  handleFileDownload(AsyncWebServerRequest *request);
   void  handleGetVersion(AsyncWebServerRequest *request);
+  void  handleSaveLogicMap(AsyncWebServerRequest *request);
 };
 
 #endif
