@@ -24,7 +24,7 @@ Only for ESP32
 
 Only for ESP8266
 - https://github.com/me-no-dev/ESPAsyncTCP
-- https://github.com/dzsoni/BasicOTA-
+- https://github.com/dzsoni/BasicOTA
 - https://github.com/dzsoni/SimpleJsonParser
 - https://github.com/me-no-dev/ESPAsyncWebServer
 
