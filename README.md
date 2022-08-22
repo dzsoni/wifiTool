@@ -48,22 +48,21 @@ https://github.com/me-no-dev/arduino-esp32fs-plugin
 Download JAR file from
 https://github.com/me-no-dev/arduino-esp32fs-plugin/releases/tag/1.0
 
-The files are stored in the "data" library. and you will need to upload the, with the uplod tool 
-in order for the firmware to work well.  
+The files are stored in the "data" library. and you will need to upload with the upload tool 
+in order to work the firmware well.  
 
-The router - password are kept in a json file named "secrets.json" so you can set the data before uploading the 
-data into the SPIFSS, this way you do not even have to run the wifi manger the first time.
+The router passwords are kept in a json file named "secrets.json", so you can set the ssid-pasword pairs before uploading the 
+json file into the SPIFSS, this way you do not even have to run the wifi manger.
 And it contains all the HTML pages as well. 
 
-Once the code is uploaded, if we fail to connect the AP will run on the ESP and you can connect to it
-by looking for a router name "config" and connecting to it - on connect a web page will open and 
-it will be redirected to the main page of the configuration tool
+Once the code is uploaded, an AP will run on the ESP and you can connect to it by looking for a AP name:"config". On connect, a web page will open and 
+it will be redirected to the main page of the configuration tool.
 
 The page has 3 links:
 
 ## Wifi setup
-This page allows you to set up to 3 router/password for the system to check for connection.
-Once save is hit, the file gets re-written and the ESP will restart and try connecting using the new data.
+This page allows you to set up to 3 router/password pair for checking at connection.
+Once you save the passwords, the board restarts, and the new passords will be used.
 
 ## OTA
 Pre compile the firmware on your computer and use this page to upload and flash a new firmware to the ESP.(The OTAwebpage.htm run from program memory so its not necessary upload to SPIFFS. It's provided for source code.)
