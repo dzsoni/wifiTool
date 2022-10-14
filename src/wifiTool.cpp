@@ -60,7 +60,7 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
-WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire>& rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
+WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire> &rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
 {
     _restartsystem = 0;
     _last_connect_atempt = 0;
@@ -109,8 +109,8 @@ void WifiTool::wifiAutoConnect()
         Serial.println(F("\nNo WiFi connection."));
         if (_apscredit[_last_connected_network].first != "")
         {
-            WiFi.begin(_apscredit[_last_connected_network].first,
-                       _apscredit[_last_connected_network].second);
+            WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
+                       _apscredit[_last_connected_network].second.c_str());
         }
         _last_connect_atempt = millis();
         _connecting = true;
@@ -119,8 +119,8 @@ void WifiTool::wifiAutoConnect()
     {
         if (++_last_connected_network >= 3)
             _last_connected_network = 0;
-        WiFi.begin(_apscredit[_last_connected_network].first,
-                   _apscredit[_last_connected_network].second);
+        WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
+                   _apscredit[_last_connected_network].second.c_str());
         _last_connect_atempt = millis();
     }
     else if (WiFi.status() == WL_CONNECTED && _connecting)
@@ -192,20 +192,21 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
 
 void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
 {
-    ENUM_NBD_ERROR err = NBD_NO_ERRROR;
+    ENUM_NBD_ERROR err = NBD_NO_ERROR;
     int s_count = 0;
     unsigned int i = 0;
     String jsonString = "{";
     for (auto w = 0; w < _sh->wire.size(); w++)
     {
-        i = 0;
-        if (!(!w && !i))
-            jsonString += ",";
-        jsonString += "\"s";
-        jsonString += s_count;
-        jsonString += "\":[";
+
         for (i = 0; i < _sh->wire.at(w)->getSensorsCount(); i++)
         {
+            if (!(!w && !i))
+                jsonString += ",";
+            jsonString += "\"s";
+            jsonString += s_count;
+            jsonString += "\":[";
+
             String gpio = String(_sh->wire.at(w)->getGPIO());
 
             DeviceAddress deva;
@@ -371,7 +372,7 @@ void WifiTool::handleSaveLogicMap(AsyncWebServerRequest *request)
                     if (listA.at(i).second != "")
                     {
                         bool statenow = _sh->relay.at(0)->getRelayState();
-                        _sh->relay.at(0)->Init(listA.at(i).second.toInt(), _sh->relay.at(0)->getInitstate(), _sh->relay.at(0)->getOnStateLevel());
+                        _sh->relay.at(0)->init(listA.at(i).second.toInt(), _sh->relay.at(0)->getInitstate(), _sh->relay.at(0)->getOnStateLevel());
                         if (statenow)
                             _sh->relay.at(0)->On();
                         else
@@ -621,7 +622,7 @@ void WifiTool::handleSendTime(AsyncWebServerRequest *request)
         b = strtoul(atm, &ptr, 10); // string to unsigned long
         b = _ntp.adjustTimeZone(b, _ntp.getUtcHour(), _ntp.getUtcMin(), _ntp.getSTDST());
         _strdt.setFromUnixTimestamp(b);
-        _strdt.valid=true;
+        _strdt.valid = true;
 
         RtcDateTime dt;
         dt.InitWithEpoch32Time(b);
@@ -676,7 +677,7 @@ void WifiTool::setUpSoftAP()
     WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                       IPAddress(DEF_GATEWAY_IP),
                       IPAddress(DEF_SUBNETMASK));
-    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKey(SECRETS_PATH, "APpassw"), 1, 0, 4);
+    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKey(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
 
     delay(500);
 
@@ -802,7 +803,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
             output += "{\"type\":\"";
             output += (file.isDirectory()) ? "dir" : "file";
             output += "\",\"name\":\"";
-            output += String(file.name()).substring(1);
+            output += String(file.name()).substring(0);
             output += "\"}";
             file = root.openNextFile();
         }
@@ -887,7 +888,7 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
     }
     if (final)
     {
-        Serial.println(F("UploadEnd: ") + filename);
+        Serial.println(String(F("UploadEnd: ")) + filename);
         _fsUploadFile.close();
         request->send(200, "text/plain", "");
     }
