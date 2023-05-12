@@ -29,7 +29,6 @@
 #endif
 
 #include <ESPAsyncWebServer.h>
-#include <SPIFFSEditor.h>
 #include <SimpleJsonParser.h>
 #include <NTPtimeESP.h>
 #include <struct_solarhardwares.h>

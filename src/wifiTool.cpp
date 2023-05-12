@@ -107,6 +107,8 @@ void WifiTool::wifiAutoConnect()
     if (WiFi.status() != WL_CONNECTED && !_connecting)
     {
         Serial.println(F("\nNo WiFi connection."));
+        Serial.print(F("Board MAC address: "));
+        Serial.println(WiFi.softAPmacAddress());
         if (_apscredit[_last_connected_network].first != "")
         {
             WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
@@ -131,6 +133,7 @@ void WifiTool::wifiAutoConnect()
         Serial.println(WiFi.localIP());
         Serial.print(F("ssid: "));
         Serial.println(WiFi.SSID());
+        
     }
 
 } // end void
@@ -187,7 +190,6 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
     }
     json += "]}";
     request->send(200, "application/json", json);
-    json = String();
 }
 
 void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
@@ -353,12 +355,21 @@ void WifiTool::handleSaveLogicMap(AsyncWebServerRequest *request)
         // select ListA to different lists
         for (unsigned int i = 0; i < listA.size(); i++)
         {
+<<<<<<< Updated upstream
             if (listA.at(i).first == "TEMP1" || listA.at(i).first == "TEMP2")
+=======
+            if (listA.at(i).first == "TEMP1" || listA.at(i).first == "TEMP2" || listA.at(i).first == "TEMP3")
+>>>>>>> Stashed changes
             { // select temps to listTemp
                 listTemp.emplace_back(&listA.at(i));
             }
 
+<<<<<<< Updated upstream
             if (listA.at(i).first == "DELTATH" || listA.at(i).first == "DELTATL")
+=======
+            if (listA.at(i).first == "DELTATH" || listA.at(i).first == "DELTATL" || listA.at(i).first == "MINEXTTEMP" || 
+                listA.at(i).first == "FREEZEONPERIOD")
+>>>>>>> Stashed changes
             { // select delta temps to listDelta
                 listDelta.emplace_back(&listA.at(i));
             }
@@ -585,6 +596,7 @@ void WifiTool::handleRescanWires(AsyncWebServerRequest *request)
 
 void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
 {
+<<<<<<< Updated upstream
     String jsonString = "{";
     jsonString.concat("\"ChannelID\":\"");
     jsonString.concat(request->arg("ChannelID"));
@@ -597,14 +609,88 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
     _WIFITOOL_PL(jsonString);
 
     File file = SPIFFS.open(F("/thingspeak.json"), "w");
+=======
+   std::vector<std::pair<String,String>> chidwrapi;
+   std::vector<std::vector<String>>       fieldmap;
+
+   for (unsigned int i = 0; i < request->args(); i = i + 10)
+        {
+            if(request->arg(i)!=""&& request->arg(i + 1)!="")
+            {
+            chidwrapi.emplace_back(std::make_pair(String{request->arg(i)},
+                                              String{request->arg(i + 1)}));
+            
+
+            std::vector<String> fi;
+            for(unsigned int n = i+2; n<i+2+8; n++)
+            {       
+                fi.emplace_back(request->arg(n));
+            }
+            fieldmap.emplace_back(fi);
+            }
+        }
+
+    String json="{";
+
+    for(unsigned int i=0; i<chidwrapi.size();i++)
+    {
+        if (i != 0)
+            json += ",";
+            json += "\"";
+            json += chidwrapi.at(i).first;
+            json += "\":\"";
+            json += chidwrapi.at(i).second;
+            json += "\"";
+    }
+    json += "}";
+    _WIFITOOL_PL(json);
+
+    File file = SPIFFS.open("/tssecret.json", "w");
+>>>>>>> Stashed changes
     if (!file)
     {
         Serial.println(F("Error opening file for writing"));
         return;
     }
+<<<<<<< Updated upstream
     file.print(jsonString);
     file.flush();
     file.close();
+=======
+    
+    file.print(json);
+    file.flush();
+    file.close();
+
+    json="{";
+    for(unsigned int i=0; i<chidwrapi.size();i++)
+    {
+        
+        for(unsigned int n=0; n<8;n++)
+        {
+            if (!(i == 0 && n ==0)) json += ",";
+            json += "\"";
+            json += String(chidwrapi.at(i).first+String("_")+String(n+1));
+            json += "\":\"";
+            json += fieldmap.at(i).at(n);
+            json += "\"";
+        }
+    }
+    json += "}";
+    _WIFITOOL_PL(json);
+
+     file = SPIFFS.open("/tsfieldmap.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    
+    file.print(json);
+    file.flush();
+    file.close();
+
+>>>>>>> Stashed changes
     request->redirect(F("/wifi_thingspeak.html"));
 }
 
@@ -677,7 +763,11 @@ void WifiTool::setUpSoftAP()
     WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                       IPAddress(DEF_GATEWAY_IP),
                       IPAddress(DEF_SUBNETMASK));
+<<<<<<< Updated upstream
     WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKey(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
+=======
+    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKeyFromFile(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
+>>>>>>> Stashed changes
 
     delay(500);
 
