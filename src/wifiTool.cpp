@@ -60,7 +60,7 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
-WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire> &rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
+WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire>& rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
 {
     _restartsystem = 0;
     _last_connect_atempt = 0;
@@ -111,8 +111,8 @@ void WifiTool::wifiAutoConnect()
         Serial.println(WiFi.softAPmacAddress());
         if (_apscredit[_last_connected_network].first != "")
         {
-            WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
-                       _apscredit[_last_connected_network].second.c_str());
+            WiFi.begin(_apscredit[_last_connected_network].first,
+                       _apscredit[_last_connected_network].second);
         }
         _last_connect_atempt = millis();
         _connecting = true;
@@ -121,8 +121,8 @@ void WifiTool::wifiAutoConnect()
     {
         if (++_last_connected_network >= 3)
             _last_connected_network = 0;
-        WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
-                   _apscredit[_last_connected_network].second.c_str());
+        WiFi.begin(_apscredit[_last_connected_network].first,
+                   _apscredit[_last_connected_network].second);
         _last_connect_atempt = millis();
     }
     else if (WiFi.status() == WL_CONNECTED && _connecting)
@@ -200,15 +200,14 @@ void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
     String jsonString = "{";
     for (auto w = 0; w < _sh->wire.size(); w++)
     {
-
+        i = 0;
+        if (!(!w && !i))
+            jsonString += ",";
+        jsonString += "\"s";
+        jsonString += s_count;
+        jsonString += "\":[";
         for (i = 0; i < _sh->wire.at(w)->getSensorsCount(); i++)
         {
-            if (!(!w && !i))
-                jsonString += ",";
-            jsonString += "\"s";
-            jsonString += s_count;
-            jsonString += "\":[";
-
             String gpio = String(_sh->wire.at(w)->getGPIO());
 
             DeviceAddress deva;
@@ -355,21 +354,13 @@ void WifiTool::handleSaveLogicMap(AsyncWebServerRequest *request)
         // select ListA to different lists
         for (unsigned int i = 0; i < listA.size(); i++)
         {
-<<<<<<< Updated upstream
-            if (listA.at(i).first == "TEMP1" || listA.at(i).first == "TEMP2")
-=======
             if (listA.at(i).first == "TEMP1" || listA.at(i).first == "TEMP2" || listA.at(i).first == "TEMP3")
->>>>>>> Stashed changes
             { // select temps to listTemp
                 listTemp.emplace_back(&listA.at(i));
             }
 
-<<<<<<< Updated upstream
-            if (listA.at(i).first == "DELTATH" || listA.at(i).first == "DELTATL")
-=======
             if (listA.at(i).first == "DELTATH" || listA.at(i).first == "DELTATL" || listA.at(i).first == "MINEXTTEMP" || 
                 listA.at(i).first == "FREEZEONPERIOD")
->>>>>>> Stashed changes
             { // select delta temps to listDelta
                 listDelta.emplace_back(&listA.at(i));
             }
@@ -596,20 +587,6 @@ void WifiTool::handleRescanWires(AsyncWebServerRequest *request)
 
 void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
 {
-<<<<<<< Updated upstream
-    String jsonString = "{";
-    jsonString.concat("\"ChannelID\":\"");
-    jsonString.concat(request->arg("ChannelID"));
-    jsonString.concat("\",");
-
-    jsonString.concat("\"WriteAPIKey\":\"");
-    jsonString.concat(request->arg("WriteAPIKey"));
-    jsonString.concat("\"}");
-
-    _WIFITOOL_PL(jsonString);
-
-    File file = SPIFFS.open(F("/thingspeak.json"), "w");
-=======
    std::vector<std::pair<String,String>> chidwrapi;
    std::vector<std::vector<String>>       fieldmap;
 
@@ -646,17 +623,11 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
     _WIFITOOL_PL(json);
 
     File file = SPIFFS.open("/tssecret.json", "w");
->>>>>>> Stashed changes
     if (!file)
     {
         Serial.println(F("Error opening file for writing"));
         return;
     }
-<<<<<<< Updated upstream
-    file.print(jsonString);
-    file.flush();
-    file.close();
-=======
     
     file.print(json);
     file.flush();
@@ -690,7 +661,6 @@ void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
     file.flush();
     file.close();
 
->>>>>>> Stashed changes
     request->redirect(F("/wifi_thingspeak.html"));
 }
 
@@ -708,7 +678,7 @@ void WifiTool::handleSendTime(AsyncWebServerRequest *request)
         b = strtoul(atm, &ptr, 10); // string to unsigned long
         b = _ntp.adjustTimeZone(b, _ntp.getUtcHour(), _ntp.getUtcMin(), _ntp.getSTDST());
         _strdt.setFromUnixTimestamp(b);
-        _strdt.valid = true;
+        _strdt.valid=true;
 
         RtcDateTime dt;
         dt.InitWithEpoch32Time(b);
@@ -763,11 +733,8 @@ void WifiTool::setUpSoftAP()
     WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                       IPAddress(DEF_GATEWAY_IP),
                       IPAddress(DEF_SUBNETMASK));
-<<<<<<< Updated upstream
-    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKey(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
-=======
+
     WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKeyFromFile(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
->>>>>>> Stashed changes
 
     delay(500);
 
@@ -893,7 +860,7 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
             output += "{\"type\":\"";
             output += (file.isDirectory()) ? "dir" : "file";
             output += "\",\"name\":\"";
-            output += String(file.name()).substring(0);
+            output += String(file.name()).substring(1);
             output += "\"}";
             file = root.openNextFile();
         }
@@ -978,7 +945,7 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
     }
     if (final)
     {
-        Serial.println(String(F("UploadEnd: ")) + filename);
+        Serial.println(F("UploadEnd: ") + filename);
         _fsUploadFile.close();
         request->send(200, "text/plain", "");
     }
