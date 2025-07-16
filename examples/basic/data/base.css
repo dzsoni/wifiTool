@@ -1,0 +1,27 @@
+*{
+  box-sizing: border-box;
+}
+h1 {
+  text-align: center;
+  font-size: 5vmax;
+}
+.contA {
+  display: flex;
+  padding: 0.1em;
+  justify-content: flex-start;
+  font-size: 3vmax;
+}
+.contB {
+  padding: 0.1em;
+  font-size: 3vmax;
+  text-align: center;
+}
+input[type=password], [type=text], [type=submit], [type="file"], [type=reset], button {
+    font-size: 2vmax;
+}
+button {
+  margin: 1vmax;
+}
+select {
+	font-size: 2vmax;
+}

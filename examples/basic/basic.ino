@@ -1,5 +1,7 @@
 #include <wifiTool.h>
-WifiTool wifiTool;
+#include <BasicOTA.h>
+AsyncWebServer webserver(80);
+WifiTool wifiTool(webserver);
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -7,15 +9,19 @@ void setup() {
   Serial.begin(115200);
   Serial.println("System started");
 
-  wifiTool.begin(false);
-  if (!wifiTool.wifiAutoConnect())
-  {
-    Serial.println("fail to connect to wifi!!!!");
-    wifiTool.runApPortal();
-  }
+  if (!SPIFFS.begin())
+    {
+        // Serious problem
+        Serial.println(F("SPIFFS Mount failed."));
+    }
+
+    BasicOTA.begin(&webserver);
+     //WifiTool init
+    wifiTool.begin();
+
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  wifiTool.process();
 
 }

@@ -1,10 +1,16 @@
 /**************************************************************
    wifiTool is a library for the ESP 8266&32/Arduino platform
    SPIFFS oriented AsyncWebServer based wifi configuration tool.
+
+   Additional improvements by Füleki János https://github.com/dzsoni/wifiTool
+
+   Forked from, and original authors:
    https://github.com/oferzv/wifiTool
 
    Built by Ofer Zvik (https://github.com/oferzv)
+
    And Tal Ofer (https://github.com/talofer99)
+
    Licensed under MIT license
  **************************************************************/
 
@@ -17,6 +23,7 @@
 
 extern "C" uint32_t _FS_start;
 extern "C" uint32_t _FS_end;
+
 extern String getVersion();
 
 /*
@@ -60,7 +67,9 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
+
 WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire> &rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
+
 {
     _restartsystem = 0;
     _last_connect_atempt = 0;
@@ -109,8 +118,10 @@ void WifiTool::wifiAutoConnect()
         Serial.println(F("\nNo WiFi connection."));
         if (_apscredit[_last_connected_network].first != "")
         {
+
             WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
                        _apscredit[_last_connected_network].second.c_str());
+
         }
         _last_connect_atempt = millis();
         _connecting = true;
@@ -119,8 +130,10 @@ void WifiTool::wifiAutoConnect()
     {
         if (++_last_connected_network >= 3)
             _last_connected_network = 0;
+
         WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
                    _apscredit[_last_connected_network].second.c_str());
+
         _last_connect_atempt = millis();
     }
     else if (WiFi.status() == WL_CONNECTED && _connecting)
@@ -187,6 +200,7 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
     }
     json += "]}";
     request->send(200, "application/json", json);
+
 }
 
 void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
@@ -197,6 +211,7 @@ void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
     String jsonString = "{";
     for (auto w = 0; w < _sh->wire.size(); w++)
     {
+
 
         for (i = 0; i < _sh->wire.at(w)->getSensorsCount(); i++)
         {
@@ -471,6 +486,7 @@ void WifiTool::handleSaveLogicMap(AsyncWebServerRequest *request)
     file.close();
     request->redirect(F("/wifi_logicmap.html"));
 }
+
 /*
    handleGetSavSecreteJson()
    Save the secrets: AP password, knonw AP passwords and SSIDs.
@@ -481,6 +497,7 @@ void WifiTool::handleGetSaveSecretJson(AsyncWebServerRequest *request)
     jsonString.concat("\"APpassw\":\"");
     jsonString.concat(request->arg(F("APpass")));
     jsonString.concat("\",");
+
 
     jsonString.concat("\"ssid0\":\"");
     jsonString.concat(request->arg(F("ssid0")));
@@ -689,6 +706,7 @@ void WifiTool::handleGetVersion(AsyncWebServerRequest *request)
 {
     _WIFITOOL_PL("Send version:" + getVersion());
     request->send(200, "text/plain", "Version:" + getVersion());
+
 }
 
 /**
@@ -731,7 +749,9 @@ void WifiTool::setUpSoftAP()
     WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                       IPAddress(DEF_GATEWAY_IP),
                       IPAddress(DEF_SUBNETMASK));
+
     WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKeyFromFile(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
+
 
     delay(500);
 
@@ -750,6 +770,7 @@ void WifiTool::setUpSoftAP()
     _server.on("/saveSecret/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
                { handleGetSaveSecretJson(request); });
 
+
     _server.on("/saveTempsens/", HTTP_POST, [&, this](AsyncWebServerRequest *request)
                { handleSaveSensorInventory(request); });
 
@@ -767,6 +788,7 @@ void WifiTool::setUpSoftAP()
 
     _server.on("/rescanwires/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
                { handleRescanWires(request); });
+
 
     _server.on("/list", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
                { handleFileList(request); });
@@ -787,6 +809,7 @@ void WifiTool::setUpSoftAP()
             handleUpload(request, filename, "/wifi_spiffs_admin.html", index, data, len, final);
         });
 
+
     _server.on("/wifiScan.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
                { getWifiScanJson(request); });
 
@@ -798,6 +821,7 @@ void WifiTool::setUpSoftAP()
 
     _server.on("/getversion", HTTP_GET, [&, this](AsyncWebServerRequest *request)
                { handleGetVersion(request); });
+
 
     _server.onNotFound([](AsyncWebServerRequest *request)
                        {
@@ -857,7 +881,9 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
             output += "{\"type\":\"";
             output += (file.isDirectory()) ? "dir" : "file";
             output += "\",\"name\":\"";
+
             output += String(file.name()).substring(0);
+
             output += "\"}";
             file = root.openNextFile();
         }
@@ -942,7 +968,9 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
     }
     if (final)
     {
+
         Serial.println(String(F("UploadEnd: ")) + filename);
+
         _fsUploadFile.close();
         request->send(200, "text/plain", "");
     }
