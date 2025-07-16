@@ -6,7 +6,9 @@
 
    Forked from, and original authors:
    https://github.com/oferzv/wifiTool
-   Ofer Zvik (https://github.com/oferzv)
+
+   Built by Ofer Zvik (https://github.com/oferzv)
+
    And Tal Ofer (https://github.com/talofer99)
 
    Licensed under MIT license
@@ -22,6 +24,7 @@
 extern "C" uint32_t _FS_start;
 extern "C" uint32_t _FS_end;
 
+extern String getVersion();
 
 /*
     class CaptiveRequestHandler
@@ -64,7 +67,9 @@ void WifiTool::begin()
 /*
     WifiTool()
 */
-WifiTool::WifiTool(AsyncWebServer &server) : _server(server)
+
+WifiTool::WifiTool(AsyncWebServer &server, struct_solarhardwares *sol, strDateTime &strdt, NTPtime &ntp, RtcDS3231<TwoWire> &rtc) : _server(server), _sh(sol), _strdt(strdt), _ntp(ntp), _rtc(rtc)
+
 {
     _restartsystem = 0;
     _last_connect_atempt = 0;
@@ -113,8 +118,10 @@ void WifiTool::wifiAutoConnect()
         Serial.println(F("\nNo WiFi connection."));
         if (_apscredit[_last_connected_network].first != "")
         {
-            WiFi.begin(_apscredit[_last_connected_network].first,
-                       _apscredit[_last_connected_network].second);
+
+            WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
+                       _apscredit[_last_connected_network].second.c_str());
+
         }
         _last_connect_atempt = millis();
         _connecting = true;
@@ -123,8 +130,10 @@ void WifiTool::wifiAutoConnect()
     {
         if (++_last_connected_network >= 3)
             _last_connected_network = 0;
-        WiFi.begin(_apscredit[_last_connected_network].first,
-                   _apscredit[_last_connected_network].second);
+
+        WiFi.begin(_apscredit[_last_connected_network].first.c_str(),
+                   _apscredit[_last_connected_network].second.c_str());
+
         _last_connect_atempt = millis();
     }
     else if (WiFi.status() == WL_CONNECTED && _connecting)
@@ -191,9 +200,292 @@ void WifiTool::getWifiScanJson(AsyncWebServerRequest *request)
     }
     json += "]}";
     request->send(200, "application/json", json);
-    json = String();
+
 }
 
+void WifiTool::handleGetTemp(AsyncWebServerRequest *request)
+{
+    ENUM_NBD_ERROR err = NBD_NO_ERROR;
+    int s_count = 0;
+    unsigned int i = 0;
+    String jsonString = "{";
+    for (auto w = 0; w < _sh->wire.size(); w++)
+    {
+
+
+        for (i = 0; i < _sh->wire.at(w)->getSensorsCount(); i++)
+        {
+            if (!(!w && !i))
+                jsonString += ",";
+            jsonString += "\"s";
+            jsonString += s_count;
+            jsonString += "\":[";
+
+            String gpio = String(_sh->wire.at(w)->getGPIO());
+
+            DeviceAddress deva;
+            _sh->wire.at(w)->getAddressByIndex(i, deva);
+
+            String name = _sh->wire.at(w)->getSenorNameByIndex(i, err);
+
+            float temp = _sh->wire.at(w)->getTempByIndex(i, err);
+
+            String unitM;
+            if (_sh->wire.at(w)->getUnitsOfMeasure() == "C")
+            {
+                unitM = "\u2103";
+            }
+            else
+            {
+                unitM = "\u2109";
+            }
+
+            jsonString += "\"";
+            jsonString += name;
+            jsonString += "\",\"";
+            jsonString += _sh->wire.at(w)->addressToString(deva);
+            jsonString += "\",\"";
+            jsonString += gpio;
+            jsonString += "\",\"";
+            jsonString += temp;
+            jsonString += "\",\"";
+            jsonString += unitM;
+            jsonString += ("\"]");
+            s_count++;
+        }
+    }
+    jsonString.concat("}");
+
+    _WIFITOOL_PL(jsonString);
+    request->send(200, "application/json", jsonString);
+}
+
+/*
+   handleGetUnknownSenors()
+   Send the address of unknown sensors.
+*/
+void WifiTool::handleGetUnknownSenors(AsyncWebServerRequest *request)
+{
+    String json = "[";
+    bool first = true;
+    for (size_t t = 0; t < _sh->wire.size(); t++)
+    {
+        for (size_t i = 0; i < _sh->wire.at(t)->getSensorsCount(); i++)
+        {
+            ENUM_NBD_ERROR err;
+            if (_sh->wire.at(t)->getSenorNameByIndex(i, err) == "")
+            {
+                if (!first)
+                    json += ",";
+                first = false;
+                json += "\"";
+                DeviceAddress tempadd;
+                _sh->wire.at(t)->getAddressByIndex(i, tempadd);
+                json += _sh->wire.at(t)->addressToString(tempadd);
+                json += "\"";
+            }
+        }
+    }
+    json += "]";
+    _WIFITOOL_PL(json);
+    request->send(200, "application/json", json);
+}
+
+void WifiTool::handleSaveSensorInventory(AsyncWebServerRequest *request)
+{
+    std::vector<std::pair<String, String>> listA;
+    std::vector<std::pair<String, String> *> listB;
+    if (request->params() > 0)
+    {
+        for (unsigned int i = 0; i < request->args(); i = i + 2)
+        {
+            listA.emplace_back(std::make_pair(String{request->arg(i)},
+                                              String{request->arg(i + 1)}));
+        }
+
+        for (unsigned int i = 0; i < listA.size() - 1; i++)
+        {
+            if (listA.at(i).second == "")
+                continue;
+            boolean found = false;
+            for (unsigned int j = i + 1; j < listA.size(); j++)
+            {
+                if (listA.at(i).second == listA.at(j).second)
+                    found = true;
+            }
+            if (!found)
+                listB.emplace_back(&listA.at(i));
+        }
+        if (listA.size() > 0)
+        {
+            if (listA.at(listA.size() - 1).second != "")
+                listB.emplace_back(&listA.at(listA.size() - 1));
+        }
+    }
+    String json = "{";
+    for (unsigned int i = 0; i < listB.size(); i++)
+    {
+        if (i != 0)
+            json += ",";
+        json += "\"";
+        json += listB.at(i)->first;
+        json += "\":\"";
+        json += listB.at(i)->second;
+        json += "\"";
+    }
+    json += "}";
+    File file = SPIFFS.open("/sensnames.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    _WIFITOOL_PL(json);
+    file.print(json);
+    file.flush();
+    file.close();
+    handleRescanWires(request);
+}
+/*
+    handleSaveLogicMap()
+    Save the sensor logic names and real names to file (map between logic names and real names)
+*/
+void WifiTool::handleSaveLogicMap(AsyncWebServerRequest *request)
+{
+    std::vector<std::pair<String, String>> listA;
+    std::vector<std::pair<String, String> *> listTemp;
+    std::vector<std::pair<String, String> *> listDelta;
+    std::vector<std::pair<String, String> *> listRelay;
+    if (request->params() > 0)
+    {
+
+        for (unsigned int i = 0; i < request->params(); i++)
+        {
+            listA.emplace_back(std::make_pair(String{request->argName(i)},
+                                              String{request->arg(i)}));
+        }
+        // select ListA to different lists
+        for (unsigned int i = 0; i < listA.size(); i++)
+        {
+            if (listA.at(i).first == "TEMP1" || listA.at(i).first == "TEMP2" || listA.at(i).first == "TEMP3")
+            { // select temps to listTemp
+                listTemp.emplace_back(&listA.at(i));
+            }
+
+            if (listA.at(i).first == "DELTATH" || listA.at(i).first == "DELTATL" || listA.at(i).first == "MINEXTTEMP" || 
+                listA.at(i).first == "FREEZEONPERIOD")
+            { // select delta temps to listDelta
+                listDelta.emplace_back(&listA.at(i));
+            }
+
+            if (listA.at(i).first == "RELAY1")
+            { // select relays to listRelay
+                listRelay.emplace_back(&listA.at(i));
+
+                if (listA.at(i).first == "RELAY1")
+                {
+                    if (listA.at(i).second != "")
+                    {
+                        bool statenow = _sh->relay.at(0)->getRelayState();
+                        _sh->relay.at(0)->init(listA.at(i).second.toInt(), _sh->relay.at(0)->getInitstate(), _sh->relay.at(0)->getOnStateLevel());
+                        if (statenow)
+                            _sh->relay.at(0)->On();
+                        else
+                        {
+                            _sh->relay.at(0)->Off();
+                        }
+                    }
+                }
+            }
+        }
+
+        // check listTemp for the same values
+        for (unsigned int i = 0; i < listTemp.size() - 1; i++)
+        {
+            if (listTemp.at(i)->second == "")
+                continue;
+            boolean found = false;
+            for (unsigned int j = i + 1; j < listTemp.size(); j++)
+            {
+                if (listTemp.at(i)->second == listTemp.at(j)->second)
+                    found = true;
+            }
+            if (found)
+                listTemp.at(i)->second = "";
+        }
+    }
+
+    String json = "{";
+    for (unsigned int i = 0; i < listTemp.size(); i++)
+    {
+        if (i != 0)
+            json += ",";
+
+        json += "\"";
+        json += listTemp.at(i)->first;
+        json += "\":\"";
+        json += listTemp.at(i)->second;
+        json += "\"";
+    }
+    json += "}";
+    File file = SPIFFS.open("/logictempnames.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    _WIFITOOL_PL(json);
+    file.print(json);
+    file.flush();
+    file.close();
+
+    json = "{";
+    for (unsigned int i = 0; i < listDelta.size(); i++)
+    {
+        if (i != 0)
+            json += ",";
+        json += "\"";
+        json += listDelta.at(i)->first;
+        json += "\":\"";
+        json += listDelta.at(i)->second;
+        json += "\"";
+    }
+    json += "}";
+    file = SPIFFS.open("/deltavalues.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    _WIFITOOL_PL(json);
+    file.print(json);
+    file.flush();
+    file.close();
+
+    json = "{";
+    for (unsigned int i = 0; i < listRelay.size(); i++)
+    {
+        if (i != 0)
+            json += ",";
+        json += "\"";
+        json += listRelay.at(i)->first;
+        json += "\":\"";
+        json += listRelay.at(i)->second;
+        json += "\"";
+    }
+    json += "}";
+    file = SPIFFS.open("/relay.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    _WIFITOOL_PL(json);
+    file.print(json);
+    file.flush();
+    file.close();
+    request->redirect(F("/wifi_logicmap.html"));
+}
 
 /*
    handleGetSavSecreteJson()
@@ -205,6 +497,7 @@ void WifiTool::handleGetSaveSecretJson(AsyncWebServerRequest *request)
     jsonString.concat("\"APpassw\":\"");
     jsonString.concat(request->arg(F("APpass")));
     jsonString.concat("\",");
+
 
     jsonString.concat("\"ssid0\":\"");
     jsonString.concat(request->arg(F("ssid0")));
@@ -243,6 +536,177 @@ void WifiTool::handleGetSaveSecretJson(AsyncWebServerRequest *request)
 
     setWifiIdetifiersfromString(jsonString);
     request->redirect(F("/wifi_manager.html"));
+}
+
+void WifiTool::handleSaveNTPJson(AsyncWebServerRequest *request)
+{
+    String extratsh = String(F("extratsh"));
+    String UTCm = String(F("UTCm"));
+    String UTCh = String(F("UTCh"));
+
+    String jsonString = "{";
+    jsonString.concat("\"NTPserver\":\"");
+    jsonString.concat(request->arg("NTPserver"));
+    jsonString.concat("\",");
+
+    jsonString.concat("\"UTCh\":\"");
+    jsonString.concat(request->arg(UTCh));
+    _ntp.setUtcHour((int8_t)request->arg(UTCh).toInt());
+    jsonString.concat("\",");
+
+    jsonString.concat("\"UTCm\":\"");
+    jsonString.concat(request->arg(UTCm));
+    _ntp.setUtcMin((uint8_t)abs(request->arg(UTCm).toInt()));
+    jsonString.concat("\",");
+
+    jsonString.concat("\"extratsh\":\"");
+    jsonString.concat(request->arg(extratsh));
+
+    if (request->arg(extratsh) == "ST")
+    {
+        _ntp.setSTDST(1); // Summer Time
+    }
+    else if (request->arg(extratsh) == "DST")
+    {
+        _ntp.setSTDST(2); // Daylight Saving Time
+    }
+    else
+    {
+        _ntp.setSTDST(0);
+    }
+
+    jsonString.concat("\"}");
+
+    _WIFITOOL_PL(jsonString);
+
+    File file = SPIFFS.open(F("/ntp.json"), "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    file.print(jsonString);
+    file.flush();
+    file.close();
+    request->redirect(F("/wifi_NTP.html"));
+}
+
+void WifiTool::handleRescanWires(AsyncWebServerRequest *request)
+{
+    for (size_t t = 0; t < _sh->wire.size(); t++)
+    {
+        _sh->wire.at(t)->rescanWire();
+    }
+    request->redirect(F("/wifi_tempinvent.html"));
+}
+
+void WifiTool::handleSaveThingspeakJson(AsyncWebServerRequest *request)
+{
+   std::vector<std::pair<String,String>> chidwrapi;
+   std::vector<std::vector<String>>       fieldmap;
+
+   for (unsigned int i = 0; i < request->args(); i = i + 10)
+        {
+            if(request->arg(i)!=""&& request->arg(i + 1)!="")
+            {
+            chidwrapi.emplace_back(std::make_pair(String{request->arg(i)},
+                                              String{request->arg(i + 1)}));
+            
+
+            std::vector<String> fi;
+            for(unsigned int n = i+2; n<i+2+8; n++)
+            {       
+                fi.emplace_back(request->arg(n));
+            }
+            fieldmap.emplace_back(fi);
+            }
+        }
+
+    String json="{";
+
+    for(unsigned int i=0; i<chidwrapi.size();i++)
+    {
+        if (i != 0)
+            json += ",";
+            json += "\"";
+            json += chidwrapi.at(i).first;
+            json += "\":\"";
+            json += chidwrapi.at(i).second;
+            json += "\"";
+    }
+    json += "}";
+    _WIFITOOL_PL(json);
+
+    File file = SPIFFS.open("/tssecret.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    
+    file.print(json);
+    file.flush();
+    file.close();
+
+    json="{";
+    for(unsigned int i=0; i<chidwrapi.size();i++)
+    {
+        
+        for(unsigned int n=0; n<8;n++)
+        {
+            if (!(i == 0 && n ==0)) json += ",";
+            json += "\"";
+            json += String(chidwrapi.at(i).first+String("_")+String(n+1));
+            json += "\":\"";
+            json += fieldmap.at(i).at(n);
+            json += "\"";
+        }
+    }
+    json += "}";
+    _WIFITOOL_PL(json);
+
+     file = SPIFFS.open("/tsfieldmap.json", "w");
+    if (!file)
+    {
+        Serial.println(F("Error opening file for writing"));
+        return;
+    }
+    
+    file.print(json);
+    file.flush();
+    file.close();
+
+    request->redirect(F("/wifi_thingspeak.html"));
+}
+
+void WifiTool::handleSendTime(AsyncWebServerRequest *request)
+{
+    AsyncWebParameter *p;
+    p = request->getParam("time", true);
+    if (_strdt.epochTime == 0 && p != nullptr)
+    {
+        char atm[11];
+        memset(atm, 0, 11);
+        strncpy(atm, p->value().c_str(), 10);
+        char *ptr;
+        unsigned long b;
+        b = strtoul(atm, &ptr, 10); // string to unsigned long
+        b = _ntp.adjustTimeZone(b, _ntp.getUtcHour(), _ntp.getUtcMin(), _ntp.getSTDST());
+        _strdt.setFromUnixTimestamp(b);
+        _strdt.valid = true;
+
+        RtcDateTime dt;
+        dt.InitWithEpoch32Time(b);
+        _rtc.SetDateTime(dt);
+        Serial.println(F("Synced with browser."));
+    }
+    request->send(200);
+}
+void WifiTool::handleGetVersion(AsyncWebServerRequest *request)
+{
+    _WIFITOOL_PL("Send version:" + getVersion());
+    request->send(200, "text/plain", "Version:" + getVersion());
+
 }
 
 /**
@@ -285,7 +749,9 @@ void WifiTool::setUpSoftAP()
     WiFi.softAPConfig(IPAddress(DEF_AP_IP),
                       IPAddress(DEF_GATEWAY_IP),
                       IPAddress(DEF_SUBNETMASK));
-    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKey(SECRETS_PATH, "APpassw"), 1, 0, 4);
+
+    WiFi.softAP(DEF_AP_NAME, _sjsonp.getJSONValueByKeyFromFile(SECRETS_PATH, "APpassw").c_str(), 1, 0, 4);
+
 
     delay(500);
 
@@ -303,6 +769,26 @@ void WifiTool::setUpSoftAP()
 
     _server.on("/saveSecret/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
                { handleGetSaveSecretJson(request); });
+
+
+    _server.on("/saveTempsens/", HTTP_POST, [&, this](AsyncWebServerRequest *request)
+               { handleSaveSensorInventory(request); });
+
+    _server.on("/logicmap/", HTTP_POST, [&, this](AsyncWebServerRequest *request)
+               { handleSaveLogicMap(request); });
+
+    _server.on("/saveNTP/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
+               { handleSaveNTPJson(request); });
+
+    _server.on("/saveThingspeak/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
+               { handleSaveThingspeakJson(request); });
+
+    _server.on("/sendTime/", HTTP_POST, [&, this](AsyncWebServerRequest *request)
+               { handleSendTime(request); });
+
+    _server.on("/rescanwires/", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
+               { handleRescanWires(request); });
+
 
     _server.on("/list", HTTP_ANY, [&, this](AsyncWebServerRequest *request)
                { handleFileList(request); });
@@ -323,8 +809,18 @@ void WifiTool::setUpSoftAP()
             handleUpload(request, filename, "/wifi_spiffs_admin.html", index, data, len, final);
         });
 
+
     _server.on("/wifiScan.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
                { getWifiScanJson(request); });
+
+    _server.on("/temp.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
+               { handleGetTemp(request); });
+
+    _server.on("/getunknownsenses.json", HTTP_GET, [&, this](AsyncWebServerRequest *request)
+               { handleGetUnknownSenors(request); });
+
+    _server.on("/getversion", HTTP_GET, [&, this](AsyncWebServerRequest *request)
+               { handleGetVersion(request); });
 
 
     _server.onNotFound([](AsyncWebServerRequest *request)
@@ -385,7 +881,9 @@ void WifiTool::handleFileList(AsyncWebServerRequest *request)
             output += "{\"type\":\"";
             output += (file.isDirectory()) ? "dir" : "file";
             output += "\",\"name\":\"";
-            output += String(file.name()).substring(1);
+
+            output += String(file.name()).substring(0);
+
             output += "\"}";
             file = root.openNextFile();
         }
@@ -470,7 +968,9 @@ void WifiTool::handleUpload(AsyncWebServerRequest *request, String filename, Str
     }
     if (final)
     {
-        Serial.println(F("UploadEnd: ") + filename);
+
+        Serial.println(String(F("UploadEnd: ")) + filename);
+
         _fsUploadFile.close();
         request->send(200, "text/plain", "");
     }

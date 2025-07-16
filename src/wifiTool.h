@@ -33,8 +33,12 @@
 #endif
 
 #include <ESPAsyncWebServer.h>
-#include <SPIFFSEditor.h>
+
 #include <SimpleJsonParser.h>
+#include <NTPtimeESP.h>
+#include <struct_solarhardwares.h>
+#include <Wire.h>
+#include <RtcDS3231.h>
 
 
 
@@ -56,7 +60,9 @@
 class WifiTool
 {
 public:
-  WifiTool(AsyncWebServer& server);
+
+  WifiTool(AsyncWebServer& server, struct_solarhardwares* sol, strDateTime &strdt_ , NTPtime &ntp_, RtcDS3231<TwoWire>& rtc );
+
   ~WifiTool();
   void process();
   void begin();
@@ -69,6 +75,12 @@ private:
   bool                  _connecting;
   byte                  _last_connected_network;
   SimpleJsonParser      _sjsonp;
+
+  strDateTime&          _strdt;
+  NTPtime&               _ntp;
+  RtcDS3231<TwoWire>&    _rtc;
+  struct_solarhardwares* _sh;
+
   std::vector< std::pair <String,String> > _apscredit;
   File                    _fsUploadFile;
 
@@ -81,12 +93,24 @@ private:
   void  handleFileDelete(AsyncWebServerRequest *request);
   void  getWifiScanJson(AsyncWebServerRequest *request);
   void  handleGetSaveSecretJson(AsyncWebServerRequest *request);
+
+  void  handleGetTemp(AsyncWebServerRequest *request);
   void  handleSaveNTPJson(AsyncWebServerRequest *request);
+  void  handleSendTime(AsyncWebServerRequest *request);
+  void  handleSaveThingspeakJson(AsyncWebServerRequest *request);
+
   int   getRSSIasQuality(int RSSI);
   void  handleUpload(AsyncWebServerRequest *request, String filename, String redirect, size_t index, uint8_t *data, size_t len, bool final);
   void  wifiAutoConnect();
   void  setWifiIdetifiersfromString(String& str);
+
+  void  handleGetUnknownSenors(AsyncWebServerRequest *request);
+  void  handleRescanWires(AsyncWebServerRequest *request);
+  void  handleSaveSensorInventory(AsyncWebServerRequest *request);
   void  handleFileDownload(AsyncWebServerRequest *request);
+  void  handleGetVersion(AsyncWebServerRequest *request);
+  void  handleSaveLogicMap(AsyncWebServerRequest *request);
+
 };
 
 #endif
